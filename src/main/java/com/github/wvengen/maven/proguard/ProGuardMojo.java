@@ -50,6 +50,7 @@ import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Java;
 import org.codehaus.plexus.archiver.jar.JarArchiver;
+import org.codehaus.plexus.archiver.war.WarArchiver;
 
 /**
  *
@@ -76,7 +77,7 @@ public class ProGuardMojo extends AbstractMojo {
 	/**
 	 * Recursively reads configuration options from the given file filename
 	 *
-	 * @parameter default-value="${basedir}/proguard.conf"
+	 * @parameter default-value="${user.home}/.m2/proguard.conf"
 	 */
 	private File proguardInclude;
 
@@ -149,7 +150,7 @@ public class ProGuardMojo extends AbstractMojo {
 	 * Additional -libraryjars e.g. ${java.home}/lib/rt.jar Project compile dependency are added automatically. See
 	 * exclusions
 	 *
-	 * @parameter
+	 * @parameter default-value="${java.home}/lib/rt.jar"
 	 */
 	private List<String> libs;
 
@@ -172,17 +173,36 @@ public class ProGuardMojo extends AbstractMojo {
 	 * @required
 	 */
 	protected String injar;
+	
+	/**
+	 * Specifies the input jar name (or wars, ears, zips) of the application to be
+	 * processed.
+	 *
+	 * You may specify a classes directory e.g. 'classes'. This way plugin will processed
+	 * the classes instead of jar. You would need to bind the execution to phase 'compile'
+	 * or 'process-classes' in this case.
+	 *
+	 * @parameter expression="${project.build.finalName}/WEB-INF/classes"
+	 *
+	 */
+	protected String inwar;
+	
+	  /**
+     * The directory where the webapp is built.
+     *
+     * @parameter default-value="${project.build.directory}/${project.build.finalName}"
+     */
+    private File webappDirectory;
 
 	/**
 	 * Set this to 'true' to bypass ProGuard processing when injar does not exists.
 	 *
-	 * @parameter default-value="false"
+	 * @parameter default-value="true"
 	 */
 	private boolean injarNotExistsSkip;
 
 	/**
 	 * Apply ProGuard classpathentry Filters to input jar. e.g. <code>!**.gif,!**&#47;tests&#47;**'</code>
-	 *
 	 * @parameter
 	 */
 	protected String inFilter;
@@ -212,7 +232,7 @@ public class ProGuardMojo extends AbstractMojo {
 	/**
 	 * Specifies whether or not to attach the created artifact to the project
 	 *
-	 * @parameter default-value="false"
+	 * @parameter default-value="true"
 	 */
 	private boolean attach;
 
@@ -297,6 +317,13 @@ public class ProGuardMojo extends AbstractMojo {
 	 * @required
 	 */
 	private JarArchiver jarArchiver;
+	/**
+	 * The Jar archiver.
+	 *
+	 * @component role="org.codehaus.plexus.archiver.Archiver" roleHint="war"
+	 * @required
+	 */
+	 private WarArchiver warArchiver;
 
 
 	/**
@@ -407,14 +434,22 @@ public class ProGuardMojo extends AbstractMojo {
 		boolean mainIsJar = mavenProject.getPackaging().equals("jar");
 
 		File inJarFile = new File(outputDirectory, injar);
+		
+		boolean mainIsWar = mavenProject.getPackaging().equals("war");
+		if(mainIsWar) {
+			inJarFile= new File(outputDirectory, inwar);
+		}
+		
 		if (!inJarFile.exists()) {
 			if (injarNotExistsSkip) {
-				log.info("Bypass ProGuard processing because \"injar\" dos not exist");
+				log.info("Bypass ProGuard processing because \"injar\" dos not exist"+inJarFile.getAbsolutePath());
 				return;
 			} else if (mainIsJar) {
 				throw new MojoFailureException("Can't find file " + inJarFile);
 			}
 		}
+		
+		
 
 		if (!outputDirectory.exists()) {
 			if (!outputDirectory.mkdirs()) {
@@ -426,11 +461,25 @@ public class ProGuardMojo extends AbstractMojo {
 		boolean sameArtifact;
 
 		if (attach) {
-			outjar = nameNoType(injar);
-			if (useArtifactClassifier()) {
-				outjar += "-" + attachArtifactClassifier;
+			if(mainIsJar) {
+				outjar = nameNoType(injar);
+				if (useArtifactClassifier()) {
+					outjar += "-" + attachArtifactClassifier;
+				}
+				outjar += "." + attachArtifactType;
+			}else {
+				//将原来的war备份一下
+				sameArtifact = true;
+				outJarFile = inJarFile.getAbsoluteFile();
+				File war=new File(outputDirectory,nameNoType(injar)+".war");
+				File warBackFile=new File(outputDirectory,nameNoType(injar)+"_proguard_base.war");
+
+				if (war.exists()) {
+					if (!war.renameTo(warBackFile)) {
+						throw new MojoFailureException("Can't rename " + war);
+					}
+				}
 			}
-			outjar += "." + attachArtifactType;
 		}
 
 		if ((outjar != null) && (!outjar.equals(injar))) {
@@ -784,6 +833,10 @@ public class ProGuardMojo extends AbstractMojo {
 				attachTextFile(new File(buildOutput, seedFileName), mainClassifier, "seed");
 			}
 		}
+		
+		if(mainIsWar) {
+			createArchiveWar();
+		}
 	}
 
 	private void attachTextFile(File theFile, String mainClassifier, String suffix) {
@@ -989,5 +1042,47 @@ public class ProGuardMojo extends AbstractMojo {
 			}
 			return file;
 		}
+	}
+	
+	/**
+	 * build war
+	 * @throws MojoExecutionException
+	 * @throws MojoFailureException
+	 */
+	private void createArchiveWar() throws MojoExecutionException, MojoFailureException {
+			log.info("createArchiveWar>>>");
+
+			File outJarFile = new File(outputDirectory, nameNoType(injar) + ".war");
+			if (outJarFile.exists()) {
+				if (!outJarFile.delete()) {
+					throw new MojoFailureException("Can't delete " + outJarFile);
+				}
+			}
+			File archiverFile = outJarFile.getAbsoluteFile();
+
+			MavenArchiver archiver = new MavenArchiver();
+			archiver.setArchiver(warArchiver);
+			archiver.setOutputFile(archiverFile);
+			archive.setAddMavenDescriptor(addMavenDescriptor);
+
+			try {
+				
+				warArchiver.addDirectory(webappDirectory);
+				 final File webXmlFile = new File( webappDirectory, "WEB-INF/web.xml" );
+			        if ( webXmlFile.exists() )
+			        {
+			            warArchiver.setWebxml( webXmlFile );
+			        }
+			        
+		            getLog().debug( "Build won't fail if web.xml file is missing." );
+		            // The flag is wrong in plexus-archiver so it will need to be fixed at some point
+		            warArchiver.setIgnoreWebxml( false );
+
+				archiver.createArchive(mavenProject, archive);
+
+			} catch (Exception e) {
+				throw new MojoExecutionException("Unable to create war", e);
+			}
+
 	}
 }
