@@ -21,3 +21,8 @@ This is the successor of the [ProGuard Maven Plugin by pyx4me](http://pyx4me.com
 支持零修改混肴，默认读取 配置${user.home}/.m2/proguard.conf 在项目中直接调用混肴的插件即可。
 支持war 混肴，将classes目录下的文件混肴，重新打war包。
 TODO 将来支持零配置，将默认的配置植入 插件中
+
+添加了 war是否需要加密的配置  proguard.skipWar 默认是 false 
+添加了 外部属性 proguard.includeList  默认值是 ${user.home}/.m2/proguard-include.conf 文件， 当只有少量项目需要混肴的时候   可以将项目的 ArtifactId 配置到文件中。
+添加了 外部属性 proguard.skipList     默认值是 ${user.home}/.m2/proguard-skip.conf 文件，    当只有少量项目不需要混肴的时候 可以将项目的 ArtifactId 配置到文件中。
+

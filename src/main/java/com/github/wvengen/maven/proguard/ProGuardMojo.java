@@ -77,7 +77,7 @@ public class ProGuardMojo extends AbstractMojo {
 	/**
 	 * Recursively reads configuration options from the given file filename
 	 *
-	 * @parameter default-value="${user.home}/.m2/proguard.conf"
+	 * @parameter property="proguard.include" default-value="${user.home}/.m2/proguard.conf"
 	 */
 	private File proguardInclude;
 
@@ -393,6 +393,24 @@ public class ProGuardMojo extends AbstractMojo {
 	private boolean silent;
 
 	private Log log;
+	
+	/**
+	 * config skip list project at file
+	 * @parameter property="proguard.skipList" default-value="${user.home}/.m2/proguard-skip.conf"
+	 */
+	private File skipList;
+	/**
+	 * config include project at file 
+	 * @parameter property="proguard.includeList" default-value="${user.home}/.m2/proguard-include.conf"
+	 */
+	private File includeList;
+	
+	/**
+	 * Set this to 'true' to bypass ProGuard processing entirely.
+	 *
+	 * @parameter property="proguard.skipWar" default-value="false"
+	 */
+	private boolean skipWar;
 
 	/**
 	 * ProGuard docs: Names with special characters like spaces and parentheses must be quoted with single or double
@@ -430,6 +448,29 @@ public class ProGuardMojo extends AbstractMojo {
 			log.info("Bypass ProGuard processing because \"proguard.skip=true\"");
 			return;
 		}
+		
+        //通过外部配置，智能跳过
+    	if (skipList != null) {
+			if (skipList.exists()) {
+				 List<String> list=FileUtil.readFile(skipList);
+				 if(list.contains(mavenProject.getArtifactId())) {
+						log.info("project <"+mavenProject.getArtifactId()+"> in file "+skipList.getPath()+"  skip it >>>>>>>>>>>");
+						return ;
+				 }
+			}
+		}
+    	
+    	//通过外部配置，智能处理
+    	if (includeList != null) {
+    		if (includeList.exists()) {
+    			List<String> list=FileUtil.readFile(includeList);
+    			if(list.contains(mavenProject.getArtifactId())) {
+    			}else {
+    			c
+    				return;
+    			}
+    		}
+    	}
 
 		boolean mainIsJar = mavenProject.getPackaging().equals("jar");
 
@@ -437,6 +478,10 @@ public class ProGuardMojo extends AbstractMojo {
 		
 		boolean mainIsWar = mavenProject.getPackaging().equals("war");
 		if(mainIsWar) {
+			if(skipWar) {
+				log.info("project <"+mavenProject.getArtifactId()+"> is war the config skipWar is true skip it >>>>>>>>>>>");
+				return;
+			}
 			inJarFile= new File(outputDirectory, inwar);
 		}
 		
