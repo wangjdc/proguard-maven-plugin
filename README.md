@@ -17,3 +17,7 @@ This is the successor of the [ProGuard Maven Plugin by pyx4me](http://pyx4me.com
 
 [ProGuard]: http://proguard.sourceforge.net/
 [Maven]: http://apache.maven.org/
+支持多模块的混肴  只要在 顶级pom中配置混肴即可， 对于pom 直接跳过。
+支持零修改混肴，默认读取 配置${user.home}/.m2/proguard.conf 在项目中直接调用混肴的插件即可。
+支持war 混肴，将classes目录下的文件混肴，重新打war包。
+TODO 将来支持零配置，将默认的配置植入 插件中
