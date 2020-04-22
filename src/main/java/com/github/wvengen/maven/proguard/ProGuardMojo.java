@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,8 +35,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.maven.archiver.MavenArchiveConfiguration;
 import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.artifact.Artifact;
@@ -466,7 +467,7 @@ public class ProGuardMojo extends AbstractMojo {
     			List<String> list=FileUtil.readFile(includeList);
     			if(list.contains(mavenProject.getArtifactId())) {
     			}else {
-    			c
+    				log.info("project <"+mavenProject.getArtifactId()+"> not in  file "+includeList.getPath()+"  skip it >>>>>>>>>>>");
     				return;
     			}
     		}
@@ -708,7 +709,17 @@ public class ProGuardMojo extends AbstractMojo {
 				args.add(fileToString(proguardInclude));
 				log.debug("proguardInclude " + proguardInclude);
 			} else {
-				log.debug("proguardInclude config does not exists " + proguardInclude);
+				try {
+					InputStream in=ProGuardMojo.class.getResourceAsStream("/proguard.conf");
+					File file=File.createTempFile("proguard-", ".conf");
+					FileOutputStream out=new FileOutputStream(file);
+					IOUtils.copy(in, out);
+					args.add("-include");
+					args.add(fileToString(file));
+					log.debug("use defaule File proguardInclude " + file);
+				}catch(Exception e){
+					e.printStackTrace();
+				}
 			}
 		}
 
