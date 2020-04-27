@@ -233,7 +233,7 @@ public class ProGuardMojo extends AbstractMojo {
 	/**
 	 * Specifies whether or not to attach the created artifact to the project
 	 *
-	 * @parameter default-value="true"
+	 * @parameter default-value="false"
 	 */
 	private boolean attach;
 
